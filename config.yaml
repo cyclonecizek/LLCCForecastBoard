@@ -1,0 +1,104 @@
+# LLCC probability board (NASA-STD-4010B), KSC/CCSFS.
+# Every rule is estimated from model output. Direct evidence comes from the hi-res models
+# (and NBM thunder probability for lightning); global ensembles supply clearly flagged
+# stand-ins only where no direct evidence exists (mainly days 3-7).
+
+display_tz: America/New_York
+days: 7
+window_hours: 3
+
+# Flight path = line from the pad along the launch azimuth for `length_nmi`.
+# Distances in the rules are measured to the nearest point of that line.
+pads:
+  - id: "39a"
+    label: LC-39A
+    lat: 28.6082
+    lon: -80.6041
+    azimuth_deg: 90
+    length_nmi: 30
+  - id: "40"
+    label: SLC-40
+    lat: 28.5620
+    lon: -80.5772
+    azimuth_deg: 90
+    length_nmi: 30
+
+rules:
+  # Lightning (4.1.1): lightning field above this within 10 nmi of the flight path.
+  ltng_threshold: 0.05
+  # Cumulus (4.1.3): tops colder than -10 C within 5 nmi = reflectivity at the -10 C (263 K)
+  # level >= cu_dbz; tops colder than -20 C within 10 nmi = echo top above h20_m.
+  cu_dbz: 5
+  h20_m: 7800          # approximate -20 C height for early autumn at the Cape; adjust seasonally
+  # Anvil (4.1.4-4.1.5, rough): deep convection within 20 nmi and high cloud >= this within 10 nmi.
+  anvil_high_cloud_pct: 50
+  # Debris (4.1.6, rough): mid/high cloud >= this within 5 nmi, no deep convection now,
+  # deep convection within 10 nmi in the previous 3 hours.
+  debris_cloud_pct: 50
+  # Thick cloud layers (4.1.8, rough): mid cloud >= this within 5 nmi with radar echo >= 7.5 dBZ.
+  thick_mid_cloud_pct: 90
+  # Disturbed weather (4.1.7, rough): >= 30 dBZ within 5 nmi under an overcast mid deck.
+  disturbed_dbz: 30
+  # Global-ensemble stand-ins: "deep convection" = precip >= precip_in with CAPE >= cape_jkg.
+  precip_in: 0.01
+  moderate_precip_in: 0.1
+  cape_jkg: 1000
+
+min_window_coverage: 0.5
+openmeteo_refresh_hours: 3
+
+sources:
+  - id: hrrr
+    kind: tle
+    label: HRRR time-lagged
+    family: hires
+    tier: direct
+    weight: 3
+    base: https://noaa-hrrr-bdp-pds.s3.amazonaws.com
+    file: "hrrr.{ymd}/conus/hrrr.t{hh}z.wrfsfcf{fh:02d}.grib2"
+    lag_cycles: 6
+    synoptic_extra: 2
+    short_fh: 18
+    long_fh: 48
+
+  - id: href
+    kind: multi_model
+    label: HREF members
+    family: hires
+    tier: direct
+    weight: 3
+    components:
+      - {id: ARW,  base: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hiresw/prod", file: "hiresw.{ymd}/hiresw.t{hh}z.arw_2p5km.f{fh:02d}.conus.grib2",     cycles: [0, 12], lag: 2, max_fh: 48}
+      - {id: ARW2, base: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hiresw/prod", file: "hiresw.{ymd}/hiresw.t{hh}z.arw_2p5km.f{fh:02d}.conusmem2.grib2", cycles: [0, 12], lag: 2, max_fh: 48}
+      - {id: FV3,  base: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hiresw/prod", file: "hiresw.{ymd}/hiresw.t{hh}z.fv3_2p5km.f{fh:02d}.conus.grib2",     cycles: [0, 12], lag: 2, max_fh: 48}
+      - {id: NAM3k, base: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod",   file: "nam.{ymd}/nam.t{hh}z.conusnest.hiresf{fh:02d}.tm00.grib2",       cycles: [0, 6, 12, 18], lag: 2, max_fh: 60}
+      - {id: HRRR, base: "https://noaa-hrrr-bdp-pds.s3.amazonaws.com",                  file: "hrrr.{ymd}/conus/hrrr.t{hh}z.wrfsfcf{fh:02d}.grib2",             cycles: [0, 6, 12, 18], lag: 2, max_fh: 48}
+
+  - id: nam3k
+    kind: multi_model
+    label: NAM 3 km
+    family: hires
+    tier: direct
+    weight: 2
+    components:
+      - {id: NAM3k, base: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod", file: "nam.{ymd}/nam.t{hh}z.conusnest.hiresf{fh:02d}.tm00.grib2", cycles: [0, 6, 12, 18], lag: 4, max_fh: 60}
+
+  # NBM thunderstorm probability (1/3/6 h), highest within 10 nmi of each flight path.
+  - id: nbm_tstm
+    kind: nbm_prob
+    label: NBM thunder probability
+    family: blend
+    tier: direct
+    weight: 2
+    base: https://noaa-nbm-grib2-pds.s3.amazonaws.com
+    file: "blend.{ymd}/{hh}/core/blend.t{hh}z.core.f{fh:03d}.co.grib2"
+    cycles: [0, 6, 12, 18]
+    max_fh: 192
+    max_period_h: 6
+
+  # Global ensembles: stand-ins only (used where no direct evidence exists).
+  - {id: ecmwf_ens, kind: openmeteo_ens, label: ECMWF ENS,      family: global, tier: standin, weight: 2, model: ecmwf_ifs025}
+  - {id: aifs_ens,  kind: openmeteo_ens, label: ECMWF AIFS ENS, family: global, tier: standin, weight: 1, model: ecmwf_aifs025}
+  - {id: gefs,      kind: openmeteo_ens, label: GEFS,           family: global, tier: standin, weight: 1, model: gfs025}
+  - {id: icon_eps,  kind: openmeteo_ens, label: ICON EPS,       family: global, tier: standin, weight: 1, model: icon_seamless}
+  - {id: gem_eps,   kind: openmeteo_ens, label: GEM EPS,        family: global, tier: standin, weight: 1, model: gem_global}

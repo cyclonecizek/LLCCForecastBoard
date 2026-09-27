@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLCC Probabilities</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #e9edf1; --panel: #ffffff; --ink: #16202b; --muted: #5b6875; --rule: #d3dae1;
+  --slight: #3a9a5b; --marginal: #e7b416; --severe: #cc3d31;
+  --hires: #1d6fb8; --blend: #8a4fbf; --global: #7a8896; --line: #16202b;
+  --font: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151c; --panel: #17202a; --ink: #e4e9ee; --muted: #93a1ae; --rule: #2a3642;
+    --slight: #3fae63; --marginal: #f0c23a; --severe: #e2574b;
+    --hires: #4b9be0; --blend: #b27be3; --global: #8795a3; --line: #f3f6f8;
+    color-scheme: dark;
+  }
+}
+:root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px;
+  line-height: 1.4; font-variant-numeric: tabular-nums; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--hires); outline-offset: 2px; }
+
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 28px; padding: 18px 20px 14px; border-bottom: 1px solid var(--rule); }
+h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.01em; line-height: 1; }
+.where { color: var(--muted); margin-top: 6px; }
+.fresh { margin-left: auto; text-align: right; }
+.fresh b { font-weight: 600; }
+.fresh.stale b { color: var(--severe); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--rule); }
+.btn { background: var(--ink); color: var(--panel); border: 0; border-radius: 4px; padding: 7px 14px; font-weight: 600; cursor: pointer; }
+.btn.ghost { background: var(--panel); color: var(--ink); border: 1px solid var(--rule); font-weight: 500; }
+.hint { color: var(--muted); }
+.banner { margin: 12px 20px 0; padding: 8px 12px; border-left: 4px solid var(--marginal); background: var(--panel); }
+.banner.bad { border-color: var(--severe); }
+
+.wrap { padding: 16px 20px 0; display: flex; flex-direction: column; gap: 18px; }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+.card h2 { margin: 0 0 8px; font-size: 17px; font-weight: 600; }
+.grid-scroll { overflow-x: auto; }
+table.g { border-collapse: separate; border-spacing: 2px; font-size: 14px; min-width: 100%; }
+table.g th { font-weight: 600; padding: 3px 4px; white-space: nowrap; text-align: center; }
+table.g th.day { border-bottom: 2px solid var(--ink); }
+table.g th.day small { display: block; font-weight: 400; color: var(--muted); }
+table.g th.today { background: color-mix(in srgb, var(--hires) 14%, transparent); }
+table.g td { text-align: center; padding: 7px 4px; border-radius: 3px; min-width: 42px; }
+table.g td.rowh { text-align: left; font-weight: 600; white-space: nowrap; padding-right: 10px; position: sticky; left: 0; background: var(--panel); z-index: 1; }
+table.g td.rowh small { display: block; font-weight: 400; color: var(--muted); }
+table.g td.p { cursor: pointer; font-weight: 600; }
+table.g td.p:hover, table.g td.p.sel { outline: 2px solid var(--ink); outline-offset: -2px; }
+td.s { background: color-mix(in srgb, var(--slight) 75%, var(--panel)); color: #fff; }
+td.m { background: color-mix(in srgb, var(--marginal) 85%, var(--panel)); color: #1b1300; }
+td.v { background: color-mix(in srgb, var(--severe) 82%, var(--panel)); color: #fff; }
+td.na { color: var(--muted); background: color-mix(in srgb, var(--rule) 40%, var(--panel)); }
+td.temp { background: color-mix(in srgb, var(--rule) 40%, var(--panel)); }
+td.past { opacity: .45; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 13px; margin-top: 8px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+.two { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 18px; }
+@media (max-width: 1000px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+.seg button { background: var(--panel); border: 0; padding: 4px 10px; cursor: pointer; border-right: 1px solid var(--rule); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+canvas { display: block; width: 100%; }
+.detail .big { font-size: 34px; font-weight: 700; line-height: 1; }
+.detail .sub { color: var(--muted); margin-bottom: 8px; }
+.bysrc { width: 100%; border-collapse: collapse; font-size: 14px; }
+.bysrc td { padding: 3px 0; }
+.bysrc td.v2 { text-align: right; width: 70px; color: var(--muted); }
+.bar { height: 8px; border-radius: 4px; background: var(--rule); position: relative; overflow: hidden; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
+
+.fams { display: flex; flex-wrap: wrap; gap: 6px 16px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--rule); }
+.fams label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.srclist { list-style: none; margin: 0; padding: 0; }
+.srclist li { display: grid; grid-template-columns: 22px 1fr auto; gap: 2px 6px; padding: 6px 0; border-top: 1px solid var(--rule); }
+.srclist li:first-child { border-top: 0; }
+.srclist .nm { font-weight: 500; }
+.srclist .nm .dot { margin-right: 6px; }
+.srclist .meta { grid-column: 2 / 4; color: var(--muted); font-size: 13px; }
+.chip { font-size: 12px; padding: 0 6px; border-radius: 9px; border: 1px solid var(--rule); color: var(--muted); align-self: start; }
+.chip.ok { color: var(--slight); border-color: currentColor; }
+.chip.partial { color: var(--marginal); border-color: currentColor; }
+.chip.error, .chip.missing { color: var(--severe); border-color: currentColor; }
+.summary { border-left: 4px solid var(--hires); padding: 4px 0 4px 14px; margin: 4px 0 16px; max-width: 78ch; }
+.summary h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+.summary p { margin: 0 0 8px; line-height: 1.5; }
+.summary ul { margin: 0 0 8px; padding-left: 20px; line-height: 1.5; }
+.summary .meta { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.summary .meta.warn { color: var(--severe); }
+.cw-in { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 10px; }
+.cw-in label { color: var(--muted); }
+.cw-in input { margin-left: 6px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: 4px 6px; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--hires); cursor: pointer; text-decoration: underline; }
+.cw-grid { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 700px) { .cw-grid { grid-template-columns: minmax(0, 1fr); } }
+.anybox { border-radius: 6px; padding: 12px 14px; color: #fff; }
+.anybox.s { background: color-mix(in srgb, var(--slight) 85%, var(--panel)); }
+.anybox.m { background: color-mix(in srgb, var(--marginal) 90%, var(--panel)); color: #1b1300; }
+.anybox.v { background: color-mix(in srgb, var(--severe) 88%, var(--panel)); }
+.anybox.na { background: color-mix(in srgb, var(--rule) 60%, var(--panel)); color: var(--ink); }
+.anybox .n { font-size: 44px; font-weight: 700; line-height: 1; }
+.anybox .l { font-weight: 600; margin-top: 4px; }
+.anybox .x { font-size: 13px; opacity: .9; margin-top: 6px; }
+table.cw { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.cw td { padding: 5px 6px; border-top: 1px solid var(--rule); }
+table.cw tr:first-child td { border-top: 0; }
+table.cw td.pv { text-align: center; width: 64px; font-weight: 700; border-radius: 3px; }
+table.cw td.inc { width: 110px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+table.cw td.bar2 { width: 34%; }
+.cw-note { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+.method { color: var(--muted); font-size: 13px; max-width: 80ch; padding: 18px 20px 32px; }
+.method p { margin: 0 0 6px; }
+.method b { color: var(--ink); font-weight: 600; }
+
+/* LLCC board additions */
+td.si { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 3px, transparent 3px 7px); font-style: italic; }
+.legend i.si { background: var(--marginal); background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.45) 0 3px, transparent 3px 7px); }
+table.g td.rowh .tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--rule); border-radius: 8px; padding: 0 5px; margin-left: 4px; vertical-align: 1px; }
+table.g tr.overall td { border-top: 2px solid var(--ink); }
+table.g tr.overall td.p { font-size: 15px; }
+table.g th.hr { font-weight: 500; color: var(--muted); font-size: 12px; min-width: 38px; }
+table.g th.day.past, table.g th.hr.past { opacity: .45; }
+.seg.pad { margin: 0; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>LLCC Probabilities</h1>
+    <div class="where" id="where">Loading…</div>
+  </div>
+  <div class="fresh" id="fresh"></div>
+</header>
+<div class="actions">
+  <span class="hint">Pad</span>
+  <div class="seg pad" id="padSeg" role="group" aria-label="Pad"></div>
+  <span class="hint">NASA-STD-4010B lightning launch commit criteria, estimated from model guidance.</span>
+</div>
+<div id="banners"></div>
+
+<main class="wrap">
+  <section class="card" id="custom">
+    <h2>Your window</h2>
+    <div class="cw-in">
+      <label>Start <input type="datetime-local" id="cwStart" step="600"></label>
+      <label>End <input type="datetime-local" id="cwEnd" step="600"></label>
+      <span class="hint" id="cwTz"></span>
+      <button class="linkbtn" type="button" id="cwClear">Clear</button>
+    </div>
+    <div id="cwOut"></div>
+  </section>
+
+  <section class="card">
+    <h2>Chance of violating each rule, 3-hour windows</h2>
+    <div class="grid-scroll"><table class="g" id="grid"></table></div>
+    <div class="legend">
+      <span><i style="background:var(--slight)"></i>Under 20%</span>
+      <span><i style="background:var(--marginal)"></i>20–50%</span>
+      <span><i style="background:var(--severe)"></i>Over 50%</span>
+      <span><i class="si"></i>Stand-in: global ensembles only, lower confidence</span>
+      <span>Rows marked "rough" rest on loose model stand-ins. Select a cell for the source breakdown.</span>
+    </div>
+  </section>
+
+  <div class="two">
+    <section class="card">
+      <h2 id="chartTitle">Hourly chance</h2>
+      <div class="seg" id="ruleSeg" role="group" aria-label="Rule"></div>
+      <canvas id="chart"></canvas>
+      <div class="legend" id="chartLegend"></div>
+    </section>
+    <aside style="display:flex;flex-direction:column;gap:18px;min-width:0">
+      <section class="card detail" id="detail"></section>
+      <section class="card">
+        <h2>Sources</h2>
+        <div class="fams" id="fams"></div>
+        <ul class="srclist" id="srclist"></ul>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<section class="method">
+  <p><b>What the numbers mean.</b> Each value is the chance that a rule is violated at some point in the window for the selected pad, estimated from model members. A member counts as a violation if any hour it has inside the window meets the rule's model criterion; sources are weight-averaged and rounded to 5%. The overall value counts a member once if it violates any checked rule, and is never below the lightning row.</p>
+  <p><b>Flight path.</b> A line from the pad along the launch azimuth (see Sources), with distances measured to its nearest point. <b>Lightning</b> uses the hi-res lightning field within 10 nmi and NBM thunderstorm probability. <b>Cumulus</b> uses model reflectivity at the -10 °C level within 5 nmi, or echo tops above the -20 °C height within 10 nmi. <b>Anvil, debris, thick cloud layers and disturbed weather</b> are rough stand-ins built from deep convection, cloud cover by layer and reflectivity. <b>Surface electric fields</b> have no model forecast and are covered in practice by the cumulus and lightning rules; <b>smoke plumes</b> are not forecast; <b>triboelectrification</b> is treated as exempt by vehicle configuration.</p>
+  <p><b>Evidence tiers.</b> Hi-res models (HRRR, HREF members, NAM 3 km) and NBM are direct evidence. Where no direct evidence covers a window (mostly past about 2.5 days), global ensembles supply a stand-in: deep convection is precipitation with CAPE of 1000 J/kg or more. Stand-in cells are hatched and should be read as lower confidence. This is a planning aid, not a substitute for LLCC evaluation by the launch weather officer.</p>
+</section>
+
+<script>
+(() => {
+"use strict";
+const DATA_URL = "data/board.json";
+const REFRESH_MS = 10 * 60 * 1000, STALE_MIN = 90;
+const RULES = [
+  { id: "lt", name: "Lightning", sec: "4.1.1" },
+  { id: null, name: "Surface electric fields", sec: "4.1.2", note: "covered by cumulus/lightning" },
+  { id: "cu", name: "Cumulus clouds", sec: "4.1.3" },
+  { id: "an", name: "Anvil clouds", sec: "4.1.4–4.1.5", rough: true },
+  { id: "db", name: "Debris clouds", sec: "4.1.6", rough: true },
+  { id: "dw", name: "Disturbed weather", sec: "4.1.7", rough: true },
+  { id: "tk", name: "Thick cloud layers", sec: "4.1.8", rough: true },
+  { id: null, name: "Smoke plumes", sec: "4.1.9", note: "not forecast" },
+  { id: null, name: "Triboelectrification", sec: "4.1.10", note: "exempt by vehicle" },
+];
+const LIVE = RULES.filter(r => r.id).map(r => r.id);
+const SPARSE = new Set(["lt"]);             // only a few sources judge it; applied as a floor for "overall"
+const FAMS = [["hires", "All hi-res"], ["blend", "All blends"], ["global", "All global ens"]];
+const $ = s => document.querySelector(s);
+const state = { data: null, enabled: {}, pad: null, cols: [], sel: null, rule: "cu", cw: { a: null, b: null },
+  inc: new Set(LIVE) };
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} }
+};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function alpha(hex, a) { const n = parseInt(hex.replace("#", ""), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+
+// ---------- time zone helpers
+let TZ = "America/New_York";
+function parts(ms) {
+  const f = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", weekday: "short", timeZoneName: "short" });
+  return Object.fromEntries(f.formatToParts(new Date(ms)).map(p => [p.type, p.value]));
+}
+function zonedToUtc(y, mo, d, h, mi = 0) {
+  const want = Date.UTC(y, mo - 1, d, h, mi); let g = want;
+  for (let k = 0; k < 3; k++) { const p = parts(g); g += want - Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute); }
+  return g;
+}
+const toLocalInput = ms => { const p = parts(ms); return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`; };
+function fromLocalInput(str) {
+  const [d, t] = str.split("T"); const [y, mo, dd] = d.split("-").map(Number); const [h, mi] = t.split(":").map(Number);
+  return zonedToUtc(y, mo, dd, h, mi) / 1000;
+}
+
+// ---------- evaluation
+function arr(m, rule) { return m.v[`${rule}@${state.pad}`] || m.v[rule] || null; }
+function stepHours(times, a) {
+  const idx = []; a.forEach((x, i) => { if (x != null) idx.push(times[i]); });
+  if (idx.length < 2) return 1;
+  const gaps = idx.slice(1).map((t, i) => (t - idx[i]) / 3600).sort((x, y) => x - y);
+  return Math.min(6, Math.max(1, gaps[Math.floor(gaps.length / 2)]));
+}
+function step(m, rule) {
+  const k = rule + "@" + state.pad; m._st = m._st || {};
+  if (!(k in m._st)) { const a = arr(m, rule); m._st[k] = a ? stepHours(state.data.times, a) : 1; }
+  return m._st[k];
+}
+const r5 = x => Math.floor(100 * x / 5 + 0.5) * 5;
+// Chance for every rule and overall over [a, b) (unix seconds).
+function evaluate(a, b) {
+  const d = state.data, cov = d.min_window_coverage ?? 0.5;
+  const t0 = Math.floor(a / 3600) * 3600, nh = Math.max(1, (b - t0) / 3600);
+  const tindex = state.tindex, hours = [];
+  for (let t = t0; t < b; t += 3600) if (tindex.has(t)) hours.push(tindex.get(t));
+  const inc = [...state.inc].filter(r => LIVE.includes(r)), need = inc.filter(r => !SPARSE.has(r));
+  const out = { hours: hours.length, rules: {}, overall: null };
+  const acc = {}, any = {};
+  for (const tier of ["direct", "standin"]) { acc[tier] = {}; for (const r of LIVE) acc[tier][r] = { num: 0, den: 0, per: {} }; any[tier] = { num: 0, den: 0, per: {} }; }
+  for (const s of d.sources) {
+    if (!s.members.length || !state.enabled[s.id]) continue;
+    const cnt = {}; for (const r of LIVE) cnt[r] = { hit: 0, n: 0 };
+    let aHit = 0, aN = 0;
+    for (const m of s.members) {
+      const judged = {};
+      for (const r of LIVE) {
+        const x = arr(m, r); if (!x) continue;
+        const vals = hours.map(i => x[i]).filter(v => v != null);
+        if (vals.length >= Math.max(1, Math.floor(cov * nh / step(m, r)))) { judged[r] = Math.max(...vals); cnt[r].n++; cnt[r].hit += judged[r]; }
+      }
+      const have = inc.filter(r => r in judged);
+      if (have.length && need.every(r => r in judged)) { aN++; aHit += Math.max(...have.map(r => judged[r])); }
+    }
+    const T = acc[s.tier || "direct"];
+    for (const r of LIVE) if (cnt[r].n) { const f = cnt[r].hit / cnt[r].n; T[r].num += s.weight * f; T[r].den += s.weight; T[r].per[s.id] = { p: f, n: cnt[r].n }; }
+    if (aN) { const f = aHit / aN, A = any[s.tier || "direct"]; A.num += s.weight * f; A.den += s.weight; A.per[s.id] = { p: f, n: aN }; }
+  }
+  for (const r of LIVE) {
+    const D = acc.direct[r], S = acc.standin[r];
+    out.rules[r] = D.den ? { p: r5(D.num / D.den), per: D.per, si: false }
+                : S.den ? { p: r5(S.num / S.den), per: S.per, si: true } : { p: null, per: {}, si: false };
+  }
+  const A = any.direct.den ? { ...any.direct, si: false } : any.standin.den ? { ...any.standin, si: true } : null;
+  let p = A ? r5(A.num / A.den) : null, si = A ? A.si : false;
+  for (const r of inc) if (SPARSE.has(r) && out.rules[r].p != null && (p == null || out.rules[r].p > p)) { p = out.rules[r].p; si = out.rules[r].si; }
+  out.overall = { p, per: A ? A.per : {}, si };
+  return out;
+}
+
+// ---------- 3-hour columns
+function columns() {
+  const d = state.data, wh = d.window_hours || 3, p = parts(d.generated_unix * 1000), cols = [];
+  for (let k = 0; k <= d.days; k++) {
+    const day = new Date(Date.UTC(+p.year, +p.month - 1, +p.day + k));
+    const y = day.getUTCFullYear(), mo = day.getUTCMonth() + 1, dd = day.getUTCDate();
+    for (let h = 0; h < 24; h += wh) {
+      const a = zonedToUtc(y, mo, dd, h) / 1000, b = zonedToUtc(y, mo, dd, h + wh) / 1000;
+      cols.push({ a, b, y, mo, dd, h, ev: evaluate(a, b) });
+    }
+  }
+  return cols;
+}
+const cls = v => v == null ? "na" : v < 20 ? "s" : v <= 50 ? "m" : "v";
+function grid() {
+  const now = Date.now() / 1000, cols = state.cols, wh = state.data.window_hours || 3;
+  let h = "<thead><tr><th></th>";
+  for (let i = 0; i < cols.length; i += 24 / wh) {
+    const c = cols[i], wd = new Date(Date.UTC(c.y, c.mo - 1, c.dd)).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+    const past = cols[i + 24 / wh - 1].b <= now;
+    h += `<th colspan="${24 / wh}" class="day${past ? " past" : ""}">${wd}<small>${c.mo}/${c.dd}</small></th>`;
+  }
+  h += "</tr><tr><th></th>" + cols.map(c => `<th class="hr${c.b <= now ? " past" : ""}">${String(c.h).padStart(2, "0")}L</th>`).join("") + "</tr></thead><tbody>";
+  const cell = (c, i, key, o) => {
+    const past = c.b <= now ? " past" : "", sel = state.sel && state.sel.i === i && state.sel.key === key ? " sel" : "";
+    return `<td class="p ${cls(o.p)}${o.si ? " si" : ""}${past}${sel}" data-i="${i}" data-key="${key}" tabindex="0" title="${o.si ? "Stand-in, lower confidence" : ""}">${o.p == null ? "–" : o.p + "%"}</td>`;
+  };
+  h += `<tr class="overall"><td class="rowh">Overall<small>any checked rule</small></td>` + cols.map((c, i) => cell(c, i, "overall", c.ev.overall)).join("") + "</tr>";
+  for (const R of RULES) {
+    h += `<tr><td class="rowh">${R.name}${R.rough ? '<span class="tag">rough</span>' : ""}<small>${R.sec}${R.note ? ", " + R.note : ""}</small></td>`;
+    h += R.id ? cols.map((c, i) => cell(c, i, R.id, c.ev.rules[R.id])).join("") : cols.map(c => `<td class="na${c.b <= now ? " past" : ""}">–</td>`).join("");
+    h += "</tr>";
+  }
+  $("#grid").innerHTML = h + "</tbody>";
+  $("#grid").querySelectorAll("td.p").forEach(td => {
+    const pick = () => { state.sel = { i: +td.dataset.i, key: td.dataset.key }; if (td.dataset.key !== "overall") state.rule = td.dataset.key; grid(); detail(); segs(); chart(); };
+    td.addEventListener("click", pick);
+    td.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+  });
+  if (!state.scrolled) {
+    const i = cols.findIndex(c => c.b > now), th = $("#grid").querySelectorAll("th.hr")[Math.max(0, i)];
+    if (th) $(".grid-scroll").scrollLeft = Math.max(0, th.offsetLeft - 190);
+    state.scrolled = true;
+  }
+}
+function breakdown(title, sub, o) {
+  const d = state.data;
+  let h = `<h2>${title}</h2><div class="sub">${sub}</div><div class="big">${o.p == null ? "–" : o.p + "%"}</div>
+    <div class="sub">${o.si ? "Stand-in from global ensembles, lower confidence" : "Direct evidence"}</div><table class="bysrc">`;
+  for (const s of d.sources) {
+    const p = o.per[s.id]; if (!p) continue;
+    h += `<tr><td>${s.label}</td><td style="width:40%"><div class="bar"><i style="width:${p.p * 100}%;background:${css("--" + s.family)}"></i></div></td><td class="v2">${Math.round(p.p * 100)}% of ${p.n}</td></tr>`;
+  }
+  return h + "</table>";
+}
+function detail() {
+  const el = $("#detail");
+  if (!state.sel) { el.innerHTML = `<h2>Source breakdown</h2><p class="sub">Select a cell in the table to see how each source contributes.</p>`; return; }
+  const c = state.cols[state.sel.i], key = state.sel.key;
+  const o = key === "overall" ? c.ev.overall : c.ev.rules[key];
+  const name = key === "overall" ? "Overall" : RULES.find(r => r.id === key).name;
+  const wd = new Date(Date.UTC(c.y, c.mo - 1, c.dd)).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+  let h = breakdown(name, `${wd} ${c.mo}/${c.dd}, ${String(c.h).padStart(2, "0")}–${String(c.h + (state.data.window_hours || 3)).padStart(2, "0")}L`, o);
+  if (key === "overall") h += `<p class="sub">Sources listed are those whose members can judge every checked rule; the lightning row sets a floor.</p>`;
+  el.innerHTML = h;
+}
+
+// ---------- your window
+function setCustom(a, b, save = true) {
+  state.cw = { a, b };
+  $("#cwStart").value = a != null ? toLocalInput(a * 1000) : "";
+  $("#cwEnd").value = b != null ? toLocalInput(b * 1000) : "";
+  if (save) {
+    const u = new URL(location.href), z = x => new Date(x * 1000).toISOString().slice(0, 16) + "Z";
+    u.hash = a != null && b != null ? `start=${z(a)}&end=${z(b)}` : "";
+    history.replaceState(null, "", u);
+    store.set("llcc.cw", a != null && b != null ? JSON.stringify(state.cw) : null);
+  }
+}
+function custom() {
+  const el = $("#cwOut"), { a, b } = state.cw;
+  $("#cwTz").textContent = parts(Date.now()).timeZoneName + " (an instantaneous window: set end a few minutes after start)";
+  if (a == null || b == null) { el.innerHTML = `<p class="cw-note">Enter a start and end time for the chance of violating each rule, and any of them, during that window.</p>`; return; }
+  if (b <= a) { el.innerHTML = `<p class="cw-note" style="color:var(--severe)">End must be after start.</p>`; return; }
+  const ev = evaluate(a, b);
+  if (!ev.hours) { el.innerHTML = `<p class="cw-note">No forecast data covers that window.</p>`; return; }
+  const o = ev.overall, mins = Math.round((b - a) / 60);
+  const left = `<div class="anybox ${cls(o.p)}"><div class="n">${o.p == null ? "–" : o.p + "%"}</div>
+    <div class="l">Chance of violating any checked rule</div>
+    <div class="x">${mins >= 120 ? Math.round(mins / 60) + " h" : mins + " min"} window at ${state.data.pads.find(p => p.id === state.pad).label}${o.si ? ", stand-in (lower confidence)" : ""}</div></div>`;
+  let rows = "";
+  for (const R of RULES) {
+    if (!R.id) { rows += `<tr><td>${R.name} <span class="hint">${R.sec}</span></td><td class="pv na">–</td><td class="bar2"></td><td class="inc">${R.note}</td></tr>`; continue; }
+    const c = ev.rules[R.id], on = state.inc.has(R.id);
+    rows += `<tr><td>${R.name} <span class="hint">${R.sec}${R.rough ? ", rough" : ""}</span></td><td class="pv ${cls(c.p)}${c.si ? " si" : ""}">${c.p == null ? "–" : c.p + "%"}</td>
+      <td class="bar2"><div class="bar"><i style="width:${c.p ?? 0}%"></i></div></td>
+      <td class="inc"><label><input type="checkbox" data-r="${R.id}" ${on ? "checked" : ""}> in overall</label></td></tr>`;
+  }
+  el.innerHTML = `<div class="cw-grid">${left}<table class="cw">${rows}</table></div>
+    <p class="cw-note">A window shorter than an hour uses the model hour it falls in. Hatched values come from global-ensemble stand-ins. Unchecking a rule removes it from the overall value here and in the table.</p>`;
+  el.querySelectorAll("input[type=checkbox]").forEach(cb => cb.addEventListener("change", () => {
+    cb.checked ? state.inc.add(cb.dataset.r) : state.inc.delete(cb.dataset.r);
+    store.set("llcc.inc", JSON.stringify([...state.inc])); recompute();
+  }));
+}
+
+// ---------- hourly chart
+function segs() {
+  $("#ruleSeg").innerHTML = RULES.filter(R => R.id).map(R => `<button type="button" data-r="${R.id}" aria-pressed="${R.id === state.rule}">${R.name}</button>`).join("");
+  $("#ruleSeg").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { state.rule = b.dataset.r; segs(); chart(); }));
+}
+function hourly(rule) {
+  const d = state.data, T = d.times.length, out = { direct: new Array(T).fill(null), standin: new Array(T).fill(null) };
+  for (let i = 0; i < T; i++) for (const tier of ["direct", "standin"]) {
+    let num = 0, den = 0;
+    for (const s of d.sources) {
+      if ((s.tier || "direct") !== tier || !state.enabled[s.id] || !s.members.length) continue;
+      let hit = 0, n = 0;
+      for (const m of s.members) { const x = arr(m, rule); if (x && x[i] != null) { n++; hit += x[i]; } }
+      if (n) { num += s.weight * hit / n; den += s.weight; }
+    }
+    if (den) out[tier][i] = num / den;
+  }
+  return out;
+}
+function chart() {
+  const cv = $("#chart"), T = state.data.times, R = RULES.find(x => x.id === state.rule);
+  $("#chartTitle").textContent = `Hourly chance: ${R.name.toLowerCase()}`;
+  const w = cv.parentElement.clientWidth - 28, h = 240, dpr = window.devicePixelRatio || 1;
+  cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + "px"; cv.style.height = h + "px";
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const L = 40, Rm = 8, top = 10, bot = 24, n = T.length - 1;
+  const x = i => L + (w - L - Rm) * i / n, y = v => top + (h - top - bot) * (1 - v);
+  g.font = `12px ${css("--font")}`; g.textAlign = "right"; g.textBaseline = "middle";
+  for (const v of [0, .2, .5, 1]) {
+    g.strokeStyle = v === .2 || v === .5 ? alpha(v === .2 ? css("--marginal") : css("--severe"), .8) : css("--rule");
+    g.setLineDash(v === .2 || v === .5 ? [4, 3] : []); g.beginPath(); g.moveTo(L, y(v)); g.lineTo(w - Rm, y(v)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = css("--muted"); g.fillText(Math.round(v * 100) + "%", L - 6, y(v));
+  }
+  g.textAlign = "center"; g.textBaseline = "top";
+  T.forEach((t, i) => { const p = parts(t * 1000); if (p.hour === "00") { g.strokeStyle = css("--rule"); g.beginPath(); g.moveTo(x(i), top); g.lineTo(x(i), h - bot); g.stroke(); g.fillStyle = css("--ink"); g.fillText(`${p.weekday} ${+p.day}`, x(i), h - bot + 5); } });
+  if (state.cw.a != null && state.cw.b > state.cw.a) {
+    const i0 = T.findIndex(t => t >= Math.floor(state.cw.a / 3600) * 3600); let i1 = T.findIndex(t => t >= state.cw.b); if (i1 < 0) i1 = n;
+    if (i0 >= 0) { g.fillStyle = alpha(css("--hires"), .16); g.fillRect(x(i0), top, Math.max(2, x(i1) - x(i0)), h - top - bot); }
+  }
+  const nowI = T.findIndex(t => t * 1000 >= Date.now());
+  if (nowI > 0) { g.strokeStyle = css("--muted"); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(x(nowI), top); g.lineTo(x(nowI), h - bot); g.stroke(); g.setLineDash([]); }
+  const st = hourly(state.rule);
+  const line = (a, color, width, dash) => { g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dash || []); g.beginPath(); let pen = false;
+    a.forEach((v, i) => { if (v == null) { pen = false; return; } pen ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)); pen = true; }); g.stroke(); g.lineWidth = 1; g.setLineDash([]); };
+  line(st.standin, css("--global"), 1.8, [5, 3]);
+  line(st.direct, css("--line"), 2.4);
+  $("#chartLegend").innerHTML = `<span><i style="background:var(--line)"></i>Direct evidence (hi-res, NBM)</span><span><i style="background:var(--global)"></i>Global-ensemble stand-in (dashed)</span><span>Hourly values; window cells use any hour in the window, so they run higher.</span>`;
+}
+
+// ---------- sources
+function saveOff() { store.set("llcc.off", JSON.stringify(state.data.sources.filter(s => s.members.length && !state.enabled[s.id]).map(s => s.id))); }
+function famToggles() {
+  const d = state.data, el = $("#fams");
+  el.innerHTML = FAMS.map(([f, name]) => `<label><input type="checkbox" data-fam="${f}"><span class="dot" style="background:var(--${f})"></span>${name}</label>`).join("");
+  el.querySelectorAll("input").forEach(cb => {
+    const srcs = d.sources.filter(s => s.family === cb.dataset.fam && s.members.length), on = srcs.filter(s => state.enabled[s.id]).length;
+    cb.disabled = !srcs.length; cb.checked = srcs.length > 0 && on === srcs.length; cb.indeterminate = on > 0 && on < srcs.length;
+    cb.addEventListener("change", () => { for (const s of srcs) state.enabled[s.id] = cb.checked; saveOff(); recompute(); });
+  });
+}
+function sourceList() {
+  const d = state.data;
+  $("#srclist").innerHTML = d.sources.map(s => {
+    const has = s.members.length > 0;
+    return `<li><input type="checkbox" id="src-${s.id}" data-id="${s.id}" ${state.enabled[s.id] ? "checked" : ""} ${has ? "" : "disabled"}>
+      <label class="nm" for="src-${s.id}"><span class="dot" style="background:var(--${s.family})"></span>${s.label}</label>
+      <span class="chip ${s.status}">${s.status}</span>
+      <span class="meta">${s.tier === "standin" ? "stand-in, " : ""}${has ? `${s.members.length} member${s.members.length > 1 ? "s" : ""}, weight ${s.weight}` : "no data"}${s.cycle ? `, ${s.cycle.replace("T", " ")}` : ""}${s.note ? `. ${s.note}` : ""}</span></li>`;
+  }).join("");
+  $("#srclist").querySelectorAll("input").forEach(cb => cb.addEventListener("change", () => { state.enabled[cb.dataset.id] = cb.checked; saveOff(); recompute(); }));
+  famToggles();
+}
+function padSeg() {
+  $("#padSeg").innerHTML = state.data.pads.map(p => `<button type="button" data-p="${p.id}" aria-pressed="${p.id === state.pad}">${p.label}</button>`).join("");
+  $("#padSeg").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { state.pad = b.dataset.p; store.set("llcc.pad", state.pad); padSeg(); header(); recompute(); }));
+}
+function recompute() { state.cols = columns(); sourceList(); grid(); detail(); custom(); chart(); }
+function header() {
+  const d = state.data, pad = d.pads.find(p => p.id === state.pad);
+  $("#where").textContent = `${pad.label} at ${pad.lat.toFixed(3)}°N, ${Math.abs(pad.lon).toFixed(3)}°W, flight path ${String(pad.azimuth_deg).padStart(3, "0")}° for ${pad.length_nmi} nmi`;
+  const age = Math.max(0, Math.round((Date.now() / 1000 - d.generated_unix) / 60)), stale = age > STALE_MIN;
+  const ageTxt = age < 90 ? `${age} min ago` : `${(age / 60).toFixed(1)} h ago`;
+  $("#fresh").className = "fresh" + (stale ? " stale" : "");
+  $("#fresh").innerHTML = `Updated <b>${d.generated.slice(11, 16)}Z ${d.generated.slice(0, 10)}</b><br><span class="where">${ageTxt}</span>`;
+  let b = "";
+  if (d.demo) b += `<div class="banner">Demo data. The first scheduled run replaces this with live guidance.</div>`;
+  if (stale && !d.demo) b += `<div class="banner bad">Data is ${ageTxt.replace(" ago", "")} old. The hourly update may have failed; check the repository's Actions tab.</div>`;
+  const bad = d.sources.filter(s => ["error", "missing"].includes(s.status));
+  if (bad.length) b += `<div class="banner">No data this run from ${bad.map(s => s.label).join(", ")}.</div>`;
+  $("#banners").innerHTML = b;
+}
+
+async function load(first) {
+  let d;
+  try {
+    const r = await fetch(DATA_URL + "?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    d = await r.json();
+  } catch (e) {
+    if (first) $("#banners").innerHTML = `<div class="banner bad">Could not load ${DATA_URL} (${e.message}). The first pipeline run creates it.</div>`;
+    return;
+  }
+  if (!first && state.data && d.generated_unix === state.data.generated_unix) { header(); return; }
+  state.data = d; TZ = d.display_tz || TZ; state.tindex = new Map(d.times.map((t, i) => [t, i]));
+  let off; try { off = new Set(JSON.parse(store.get("llcc.off") || "[]")); } catch { off = new Set(); }
+  for (const s of d.sources) if (!(s.id in state.enabled)) state.enabled[s.id] = s.members.length > 0 && !off.has(s.id);
+  if (first) {
+    const saved = store.get("llcc.pad"); state.pad = d.pads.some(p => p.id === saved) ? saved : d.pads[0].id;
+    try { const inc = JSON.parse(store.get("llcc.inc") || "null"); if (Array.isArray(inc)) state.inc = new Set(inc); } catch {}
+    const hz = k => { const m = location.hash.match(new RegExp(k + "=([\\dT:-]+)Z")); return m ? Date.parse(m[1] + ":00Z") / 1000 : null; };
+    let a = hz("start"), b = hz("end");
+    if (a == null) { try { ({ a, b } = JSON.parse(store.get("llcc.cw") || "{}")); } catch {} }
+    setCustom(a ?? null, b ?? null, false);
+  }
+  header(); padSeg(); segs(); recompute();
+}
+const cwChange = () => {
+  const a = $("#cwStart").value, b = $("#cwEnd").value;
+  setCustom(a ? fromLocalInput(a) : null, b ? fromLocalInput(b) : null);
+  if (state.data) { custom(); chart(); }
+};
+$("#cwStart").addEventListener("change", cwChange);
+$("#cwEnd").addEventListener("change", cwChange);
+$("#cwClear").addEventListener("click", () => { setCustom(null, null); if (state.data) { custom(); chart(); } });
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => state.data && chart(), 150); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => state.data && recompute());
+window.llccEvaluate = (a, b) => evaluate(a, b);   // handy in the console
+load(true); setInterval(() => load(false), REFRESH_MS);
+})();
+</script>
+</body>
+</html>
